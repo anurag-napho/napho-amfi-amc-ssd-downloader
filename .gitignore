@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache/
+
+data/downloads/*
+!data/downloads/.gitkeep
+
+data/reports/*
+!data/reports/.gitkeep
+
+data/logs/*
+!data/logs/.gitkeep
+
+skills/asd-ste100/
+amfi_scheme_details_debug.png
