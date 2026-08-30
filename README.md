@@ -21,11 +21,15 @@ The application does not use PostgreSQL or S3.
 
 ```mermaid
 flowchart LR
-    A[Get AMCs] --> B[Get schemes]
-    B --> C[Get fresh SSD URLs]
-    C --> D[Check each URL]
-    D --> E[Download or skip files]
-    E --> F[Write report and log]
+    A[Main thread discovers schemes and URLs] --> B[Bounded scheme job queue]
+    B --> C[Scheme worker 1]
+    B --> D[Scheme worker 2]
+    B --> E[Scheme worker 3]
+    B --> F[Scheme worker 4]
+    C --> G[Main thread writes ordered report rows]
+    D --> G
+    E --> G
+    F --> G
 ```
 
 For each run, the application does these steps:
@@ -81,16 +85,16 @@ Then activate the environment again.
 
 ## Run a small test first
 
-Process one AMC and two schemes:
+Process one AMC and two schemes with four download workers:
 
 ```bash
-python main.py --limit-amcs 1 --limit-schemes 2
+python main.py --limit-amcs 1 --limit-schemes 2 --workers 4
 ```
 
 Run the same command a second time:
 
 ```bash
-python main.py --limit-amcs 1 --limit-schemes 2
+python main.py --limit-amcs 1 --limit-schemes 2 --workers 4
 ```
 
 The second run still checks every available URL. It marks valid local files as
@@ -177,6 +181,24 @@ The application processes XML, XLS/XLSX, and PDF separately.
 
 One file failure does not stop the next file. One scheme failure does not stop
 the next scheme.
+
+## Concurrent downloads
+
+The application downloads up to four schemes at the same time by default.
+Each scheme job has a separate HTTP session. The job downloads that scheme's
+formats in sequence. AMFI discovery and CSV writes stay on the main thread.
+
+Use `--workers 1` for sequential downloads:
+
+```bash
+python main.py --workers 1
+```
+
+You can set `--workers` from 1 through 16.
+
+If you press `Ctrl+C`, the application cancels jobs that did not start. Active
+requests finish through their configured timeouts. The report keeps completed
+rows.
 
 ## Validation rules
 

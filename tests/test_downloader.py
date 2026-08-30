@@ -35,6 +35,13 @@ class FakeSession:
         return self.responses.pop(0)
 
 
+class InterruptingResponse(FakeResponse):
+    def iter_content(self, chunk_size):
+        del chunk_size
+        yield b"partial"
+        raise KeyboardInterrupt
+
+
 def test_existing_file_is_skipped_only_after_streamed_url_check(tmp_path):
     output_path = tmp_path / "SSD.pdf"
     output_path.write_bytes(b"%PDF-valid local file")
@@ -90,3 +97,39 @@ def test_streamed_response_downloads_and_validates_file(tmp_path):
     assert result.status == "DOWNLOADED"
     assert output_path.read_bytes() == b"<?xml version='1.0'?><root />"
     assert not (tmp_path / "SSD.xml.part").exists()
+
+
+def test_failed_validation_removes_part_file(tmp_path):
+    output_path = tmp_path / "SSD.pdf"
+    session = FakeSession([FakeResponse(chunks=[b"not a pdf"])])
+
+    result = download_file(
+        session,
+        "https://portal.amfiindia.com/SSD.pdf",
+        output_path,
+        "pdf",
+    )
+
+    assert result.status == "FAILED"
+    assert not output_path.exists()
+    assert not (tmp_path / "SSD.pdf.part").exists()
+
+
+def test_ctrl_c_removes_part_file_and_propagates_interrupt(tmp_path):
+    output_path = tmp_path / "SSD.pdf"
+    session = FakeSession([InterruptingResponse()])
+
+    try:
+        download_file(
+            session,
+            "https://portal.amfiindia.com/SSD.pdf",
+            output_path,
+            "pdf",
+        )
+    except KeyboardInterrupt:
+        pass
+    else:
+        raise AssertionError("KeyboardInterrupt was not propagated")
+
+    assert not output_path.exists()
+    assert not (tmp_path / "SSD.pdf.part").exists()

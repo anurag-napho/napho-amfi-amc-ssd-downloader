@@ -103,6 +103,9 @@ def download_file(
             path=str(output_path),
         )
 
+    except KeyboardInterrupt:
+        part_path.unlink(missing_ok=True)
+        raise
     except Exception as exc:
         part_path.unlink(missing_ok=True)
         return DownloadResult(
